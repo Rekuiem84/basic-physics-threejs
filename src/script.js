@@ -1,13 +1,44 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import GUI from "lil-gui";
-import CANNON from "cannon";
+import * as CANNON from "cannon-es";
 import { Timer } from "three/examples/jsm/Addons.js";
 
 /**
  * Debug
  */
 const gui = new GUI();
+const debugObject = {};
+debugObject.generateSphere = () => {
+	generateSphere(Math.random() + 0.25, {
+		x: (Math.random() - 0.5) * 5,
+		y: 3,
+		z: (Math.random() - 0.5) * 5,
+	});
+};
+debugObject.generateBox = () => {
+	generateBox(Math.random() + 0.5, {
+		x: (Math.random() - 0.5) * 5,
+		y: 3,
+		z: (Math.random() - 0.5) * 5,
+	});
+};
+debugObject.reset = () => {
+	objectsToUpdate.forEach((object) => {
+		// Remove the mesh
+		scene.remove(object.mesh);
+
+		// Remove the body and the event listener
+		world.removeBody(object.body);
+		// object.body.removeEventListener("collide", playCollisionSound);
+
+		// Remove all the object from the array
+	});
+	objectsToUpdate.splice(0, objectsToUpdate.length);
+};
+gui.add(debugObject, "generateSphere").name("Generate Sphere");
+gui.add(debugObject, "generateBox").name("Generate Box");
+gui.add(debugObject, "reset").name("Reset scene");
 
 /**
  * Base
@@ -17,6 +48,20 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
+
+// Sound
+const collisionSound = new Audio("./sounds/hit.mp3");
+
+function playCollisionSound(collision) {
+	// Get collision strength
+	const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+
+	if (impactStrength > 1.5) {
+		collisionSound.volume = Math.min(impactStrength / 10, 1); // Adjust volume based on impact strength
+		collisionSound.currentTime = 0; // Reset sound to allow multiple plays
+		collisionSound.play();
+	}
+}
 
 /**
  * Textures
@@ -37,6 +82,8 @@ const environmentMapTexture = cubeTextureLoader.load([
  * Physics
  */
 const world = new CANNON.World();
+world.broadphase = new CANNON.SAPBroadphase(world); // Algorithm to optimize collision detection
+world.allowSleep = true; // Allow bodies to sleep when they are not moving (performance optimization)
 world.gravity.set(0, -9.81, 0); // gravity
 
 // Materials
@@ -72,21 +119,21 @@ world.addContactMaterial(defaultContactMaterial);
 world.defaultContactMaterial = defaultContactMaterial;
 
 // Sphere shape
-const sphereShape = new CANNON.Sphere(0.5);
-const sphereBody = new CANNON.Body({
-	mass: 1,
-	position: new CANNON.Vec3(0, 3, 0),
-	shape: sphereShape,
-});
+// const sphereShape = new CANNON.Sphere(0.5);
+// const sphereBody = new CANNON.Body({
+// 	mass: 1,
+// 	position: new CANNON.Vec3(0, 3, 0),
+// 	shape: sphereShape,
+// });
 
 // Applying force
-sphereBody.applyLocalForce(
-	new CANNON.Vec3(150, 300, 0), // Force vector
-	new CANNON.Vec3(0, 0, 0) // Origin point (where the force is applied)
-);
+// sphereBody.applyLocalForce(
+// 	new CANNON.Vec3(150, 300, 0), // Force vector
+// 	new CANNON.Vec3(0, 0, 0) // Origin point (where the force is applied)
+// );
 
 // Add the sphere body to the physics world
-world.addBody(sphereBody);
+// world.addBody(sphereBody);
 
 // Floor
 const floorShape = new CANNON.Plane();
@@ -104,18 +151,18 @@ world.addBody(floorBody);
 /**
  *  Test sphere
  */
-const sphere = new THREE.Mesh(
-	new THREE.SphereGeometry(0.5, 32, 32),
-	new THREE.MeshStandardMaterial({
-		metalness: 0.3,
-		roughness: 0.4,
-		envMap: environmentMapTexture,
-		envMapIntensity: 0.5,
-	})
-);
-sphere.castShadow = true;
-sphere.position.y = 0.5;
-scene.add(sphere);
+// const sphere = new THREE.Mesh(
+// 	new THREE.SphereGeometry(0.5, 32, 32),
+// 	new THREE.MeshStandardMaterial({
+// 		metalness: 0.3,
+// 		roughness: 0.4,
+// 		envMap: environmentMapTexture,
+// 		envMapIntensity: 0.5,
+// 	})
+// );
+// sphere.castShadow = true;
+// sphere.position.y = 0.5;
+// scene.add(sphere);
 
 /**
  * Floor
@@ -202,6 +249,76 @@ renderer.setSize(sizes.width, sizes.height);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 /**
+ * Generate spheres
+ */
+
+const objectsToUpdate = [];
+
+const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+const objectMaterial = new THREE.MeshStandardMaterial({
+	metalness: 0.3,
+	roughness: 0.4,
+	envMap: environmentMapTexture,
+});
+
+function generateSphere(radius, position) {
+	// ThreeJS mesh
+	const mesh = new THREE.Mesh(sphereGeometry, objectMaterial);
+	mesh.scale.setScalar(radius);
+	mesh.castShadow = true;
+	mesh.position.copy(position);
+	scene.add(mesh);
+
+	// CANNON body
+	const shape = new CANNON.Sphere(radius);
+	const body = new CANNON.Body({
+		mass: 1,
+		position: new CANNON.Vec3(position.x, position.y, position.z),
+		shape: shape,
+		material: defaultMaterial,
+	});
+	body.position.copy(position);
+	body.addEventListener("collide", playCollisionSound);
+	world.addBody(body);
+
+	// Add to objects to update array
+	objectsToUpdate.push({ mesh, body });
+}
+generateSphere(0.5, { x: 0, y: 3, z: 0 });
+
+/**
+ * Generate boxes
+ */
+
+const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+
+function generateBox(size, position) {
+	// ThreeJS mesh
+	const mesh = new THREE.Mesh(boxGeometry, objectMaterial);
+	mesh.scale.setScalar(size);
+	mesh.castShadow = true;
+	mesh.position.copy(position);
+	scene.add(mesh);
+
+	// CANNON body
+	const shape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2));
+	const body = new CANNON.Body({
+		mass: 1,
+		position: new CANNON.Vec3(position.x, position.y, position.z),
+		shape: shape,
+		material: defaultMaterial,
+	});
+	body.position.copy(position);
+	body.addEventListener("collide", playCollisionSound);
+
+	world.addBody(body);
+
+	// Add to objects to update array
+	objectsToUpdate.push({ mesh, body });
+}
+generateBox(1, { x: 4, y: 3, z: 2 });
+
+/**
  * Animate
  */
 // const clock = new THREE.Clock();
@@ -218,16 +335,22 @@ const tick = () => {
 	const elapsedTime = timer.getElapsed();
 
 	// Wind
-	sphereBody.applyForce(
-		new CANNON.Vec3(-0.5, 0, 0), // Force vector
-		sphereBody.position // Origin point (where the force is applied)
-	);
+	// sphereBody.applyForce(
+	// 	new CANNON.Vec3(-1, 0, 0), // Force vector
+	// 	sphereBody.position // Origin point (where the force is applied)
+	// );
 
 	// Update physics world
 	world.step(1 / 60, timer.getDelta(), 3);
 
 	// Update 3D world
-	sphere.position.copy(sphereBody.position);
+	// sphere.position.copy(sphereBody.position);
+
+	objectsToUpdate.forEach((object) => {
+		// Update mesh position
+		object.mesh.position.copy(object.body.position);
+		object.mesh.quaternion.copy(object.body.quaternion);
+	});
 
 	// Update controls
 	controls.update();
