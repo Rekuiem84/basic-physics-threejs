@@ -167,19 +167,132 @@ world.addBody(floorBody);
 /**
  * Floor
  */
-const floor = new THREE.Mesh(
-	new THREE.PlaneGeometry(10, 10),
-	new THREE.MeshStandardMaterial({
-		color: "#777777",
-		metalness: 0.3,
-		roughness: 0.4,
-		envMap: environmentMapTexture,
-		envMapIntensity: 0.5,
-	})
+// const floor = new THREE.Mesh(
+// 	new THREE.PlaneGeometry(10, 10),
+// 	new THREE.MeshStandardMaterial({
+// 		color: "#777777",
+// 		metalness: 0.3,
+// 		roughness: 0.4,
+// 		envMap: environmentMapTexture,
+// 		envMapIntensity: 0.5,
+// 	})
+// );
+
+const poolGroup = new THREE.Group();
+scene.add(poolGroup);
+
+const poolWidth = 8;
+const poolWallThickness = 0.5;
+const poolWallHeight = 1.5;
+
+const poolGreenMaterial = new THREE.MeshStandardMaterial({
+	color: "#428F41",
+	metalness: 0.3,
+	roughness: 0.4,
+	envMap: environmentMapTexture,
+	envMapIntensity: 0.5,
+	// wireframe: true,
+	side: THREE.DoubleSide,
+});
+const poolWoodMaterial = new THREE.MeshStandardMaterial({
+	color: "#91542B",
+	metalness: 0.3,
+	roughness: 0.4,
+	envMap: environmentMapTexture,
+	envMapIntensity: 0.5,
+	// wireframe: true,
+	side: THREE.DoubleSide,
+});
+
+const pool = new THREE.Shape();
+pool.moveTo(poolWidth, poolWidth);
+pool.lineTo(poolWidth, -poolWidth);
+pool.lineTo(-poolWidth, -poolWidth);
+pool.lineTo(-poolWidth, poolWidth);
+
+const hole = new THREE.Path();
+hole.moveTo(poolWidth - poolWallThickness, poolWidth - poolWallThickness);
+hole.lineTo(poolWidth - poolWallThickness, -(poolWidth - poolWallThickness));
+hole.lineTo(-(poolWidth - poolWallThickness), -(poolWidth - poolWallThickness));
+hole.lineTo(-(poolWidth - poolWallThickness), poolWidth - poolWallThickness);
+pool.holes.push(hole);
+
+const poolFloor = new THREE.Mesh(
+	new THREE.PlaneGeometry(poolWidth * 2, poolWidth * 2),
+	poolGreenMaterial
 );
-floor.receiveShadow = true;
-floor.rotation.x = -Math.PI * 0.5;
-scene.add(floor);
+poolFloor.rotation.x = -Math.PI * 0.5; // Rotate the floor to be horizontal
+
+const extrudeSettings = {
+	steps: 1,
+	depth: poolWallHeight,
+	bevelEnabled: true,
+	bevelThickness: 0.1,
+	bevelSize: 0.1,
+	bevelOffset: 0,
+	bevelSegments: 1,
+};
+
+const poolGeometry = new THREE.ExtrudeGeometry(pool, extrudeSettings);
+poolGeometry.rotateX(-Math.PI * 0.5); // Rotate the geometry to be horizontal
+const poolMesh = new THREE.Mesh(poolGeometry, poolWoodMaterial);
+
+poolGroup.add(poolMesh);
+poolGroup.add(poolFloor);
+
+// Pool physics bodies to match the visual pool
+const poolPhysicsBody = new CANNON.Body({ mass: 0 });
+
+// Pool floor (bottom of the pool)
+const poolFloorShape = new CANNON.Box(
+	new CANNON.Vec3(
+		poolWidth - poolWallThickness,
+		0.1,
+		poolWidth - poolWallThickness
+	)
+);
+poolPhysicsBody.addShape(poolFloorShape, new CANNON.Vec3(0, 0.1, 0));
+
+// Pool walls
+// Front wall
+const frontWallShape = new CANNON.Box(
+	new CANNON.Vec3(poolWidth, poolWallHeight / 2, poolWallThickness / 2)
+);
+poolPhysicsBody.addShape(
+	frontWallShape,
+	new CANNON.Vec3(0, poolWallHeight / 2, poolWidth - poolWallThickness / 2)
+);
+
+// Back wall
+poolPhysicsBody.addShape(
+	frontWallShape,
+	new CANNON.Vec3(0, poolWallHeight / 2, -poolWidth + poolWallThickness / 2)
+);
+
+// Left wall
+const sideWallShape = new CANNON.Box(
+	new CANNON.Vec3(
+		poolWallThickness / 2,
+		poolWallHeight / 2,
+		poolWidth - poolWallThickness
+	)
+);
+poolPhysicsBody.addShape(
+	sideWallShape,
+	new CANNON.Vec3(-poolWidth + poolWallThickness / 2, poolWallHeight / 2, 0)
+);
+
+// Right wall
+poolPhysicsBody.addShape(
+	sideWallShape,
+	new CANNON.Vec3(poolWidth - poolWallThickness / 2, poolWallHeight / 2, 0)
+);
+
+world.addBody(poolPhysicsBody);
+
+// floor.receiveShadow = true;
+// floor.rotation.x = -Math.PI * 0.5;
+// scene.add(floor);
 
 /**
  * Lights
