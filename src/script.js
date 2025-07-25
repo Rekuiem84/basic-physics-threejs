@@ -64,21 +64,6 @@ function playCollisionSound(collision) {
 }
 
 /**
- * Textures
- */
-const textureLoader = new THREE.TextureLoader();
-const cubeTextureLoader = new THREE.CubeTextureLoader();
-
-const environmentMapTexture = cubeTextureLoader.load([
-	"/textures/environmentMaps/0/px.png",
-	"/textures/environmentMaps/0/nx.png",
-	"/textures/environmentMaps/0/py.png",
-	"/textures/environmentMaps/0/ny.png",
-	"/textures/environmentMaps/0/pz.png",
-	"/textures/environmentMaps/0/nz.png",
-]);
-
-/**
  * Physics
  */
 const world = new CANNON.World();
@@ -108,8 +93,8 @@ const defaultContactMaterial = new CANNON.ContactMaterial(
 	defaultMaterial,
 	defaultMaterial,
 	{
-		friction: 0.1,
-		restitution: 0.66, // bounciness
+		friction: 0.2,
+		restitution: 0.5, // bounciness
 	}
 );
 
@@ -148,36 +133,6 @@ const floorBody = new CANNON.Body({
 floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5);
 world.addBody(floorBody);
 
-/**
- *  Test sphere
- */
-// const sphere = new THREE.Mesh(
-// 	new THREE.SphereGeometry(0.5, 32, 32),
-// 	new THREE.MeshStandardMaterial({
-// 		metalness: 0.3,
-// 		roughness: 0.4,
-// 		envMap: environmentMapTexture,
-// 		envMapIntensity: 0.5,
-// 	})
-// );
-// sphere.castShadow = true;
-// sphere.position.y = 0.5;
-// scene.add(sphere);
-
-/**
- * Floor
- */
-// const floor = new THREE.Mesh(
-// 	new THREE.PlaneGeometry(10, 10),
-// 	new THREE.MeshStandardMaterial({
-// 		color: "#777777",
-// 		metalness: 0.3,
-// 		roughness: 0.4,
-// 		envMap: environmentMapTexture,
-// 		envMapIntensity: 0.5,
-// 	})
-// );
-
 const poolGroup = new THREE.Group();
 scene.add(poolGroup);
 
@@ -189,7 +144,6 @@ const poolGreenMaterial = new THREE.MeshStandardMaterial({
 	color: "#428F41",
 	metalness: 0.3,
 	roughness: 0.4,
-	envMap: environmentMapTexture,
 	envMapIntensity: 0.5,
 	// wireframe: true,
 	side: THREE.DoubleSide,
@@ -198,7 +152,6 @@ const poolWoodMaterial = new THREE.MeshStandardMaterial({
 	color: "#91542B",
 	metalness: 0.3,
 	roughness: 0.4,
-	envMap: environmentMapTexture,
 	envMapIntensity: 0.5,
 	// wireframe: true,
 	side: THREE.DoubleSide,
@@ -371,7 +324,6 @@ const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
 const objectMaterial = new THREE.MeshStandardMaterial({
 	metalness: 0.3,
 	roughness: 0.4,
-	envMap: environmentMapTexture,
 });
 
 function generateSphere(radius, position) {
@@ -392,12 +344,28 @@ function generateSphere(radius, position) {
 	});
 	body.position.copy(position);
 	body.addEventListener("collide", playCollisionSound);
+
+	// Apply a random force to the sphere
+	body.applyLocalForce(
+		new CANNON.Vec3(-Math.random() * 400, 300, -Math.random() * 400), // Force vector
+		new CANNON.Vec3(0, 0, 0) // Origin point (where the force is applied)
+	);
 	world.addBody(body);
 
 	// Add to objects to update array
 	objectsToUpdate.push({ mesh, body });
 }
-generateSphere(0.5, { x: 0, y: 3, z: 0 });
+
+// Generate 10 spheres on page load with 1s interval between each
+for (let i = 0; i < 12; i++) {
+	setTimeout(() => {
+		generateSphere(Math.random() + 0.25, {
+			x: 5,
+			y: 3,
+			z: 5,
+		});
+	}, i * 500); // Each sphere generated 500ms after the previous one
+}
 
 /**
  * Generate boxes
@@ -424,12 +392,28 @@ function generateBox(size, position) {
 	body.position.copy(position);
 	body.addEventListener("collide", playCollisionSound);
 
+	body.applyLocalForce(
+		new CANNON.Vec3(Math.random() * 400, 300, Math.random() * 400), // Force vector
+		new CANNON.Vec3(0, 0, 0) // Origin point (where the force is applied)
+	);
+
 	world.addBody(body);
 
 	// Add to objects to update array
 	objectsToUpdate.push({ mesh, body });
 }
-generateBox(1, { x: 4, y: 3, z: 2 });
+for (let i = 0; i < 12; i++) {
+	setTimeout(() => {
+		generateBox(Math.random() + 0.5, {
+			x: -5,
+			y: 3,
+			z: -5,
+		});
+	}, i * 500); // Each sphere generated 500ms after the previous one
+}
+
+const axesHelper = new THREE.AxesHelper(5);
+axesHelper.position.set(0, 0.1, 0); // Slightly above
 
 /**
  * Animate
