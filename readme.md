@@ -6,7 +6,7 @@ Une scène 3D interactive de simulation physique créée avec [Three.js](https:/
 
 ## 🚀 Démo
 
-[Voir la démo](https://rekuiem84.github.io/physics/)
+[Voir la démo](https://rekuiem84.github.io/basic-physics-threejs/)
 
 ## ✨ Fonctionnalités
 
@@ -23,8 +23,8 @@ Une scène 3D interactive de simulation physique créée avec [Three.js](https:/
 1. **Cloner le dépôt :**
 
    ```bash
-   git clone https://github.com/Rekuiem84/physics
-   cd physics
+   git clone https://github.com/Rekuiem84/basic-physics-threejs
+   cd basic-physics-threejs
    ```
 
 2. **Installer les dépendances :**
