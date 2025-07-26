@@ -403,7 +403,7 @@ debugObject.canonShootingPower = 650; // Shooting power
 debugObject.canonShootingDelay = 200; // Frequency of shooting in milliseconds
 
 debugObject.canonIsRotating = false;
-debugObject.canonIsShooting = false;
+debugObject.canonIsShooting = true;
 debugObject.shootingInterval = null; // Store the interval ID for proper cleanup
 
 const canonGroup = new THREE.Group();
