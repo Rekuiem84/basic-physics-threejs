@@ -7,38 +7,50 @@ import { Timer } from "three/examples/jsm/Addons.js";
 /**
  * Debug
  */
-const gui = new GUI();
+const gui = new GUI({ width: 350 });
+
 const debugObject = {};
+
 debugObject.generateSphere = () => {
-	generateSphere(Math.random() + 0.25, {
-		x: (Math.random() - 0.5) * 5,
-		y: 3,
-		z: (Math.random() - 0.5) * 5,
-	});
+	// Rayon de la sphère
+	const radius = Math.random() * 0.5 + 0.25; // Random radius between 0.2 and 0.75
+
+	// Position de la sphère
+	const position = new THREE.Vector3(
+		(Math.random() - 0.5) * poolWidth,
+		Math.random() * 5 + 5,
+		(Math.random() - 0.5) * poolWidth
+	);
+
+	// Créer la sphère
+	const { mesh, body } = createSphere(radius, position);
+
+	// Ajouter la sphère à la scène et au monde physique
+	scene.add(mesh);
+	world.addBody(body);
+	objectsToUpdate.push({ mesh, body });
 };
-debugObject.generateBox = () => {
-	generateBox(Math.random() + 0.5, {
-		x: (Math.random() - 0.5) * 5,
-		y: 3,
-		z: (Math.random() - 0.5) * 5,
-	});
+debugObject.shootSphere = () => {
+	shootSphere();
 };
-debugObject.reset = () => {
+
+debugObject.remoteAllObjects = () => {
 	objectsToUpdate.forEach((object) => {
 		// Remove the mesh
 		scene.remove(object.mesh);
 
 		// Remove the body and the event listener
 		world.removeBody(object.body);
-		// object.body.removeEventListener("collide", playCollisionSound);
+		object.body.removeEventListener("collide", playCollisionSound);
 
 		// Remove all the object from the array
 	});
 	objectsToUpdate.splice(0, objectsToUpdate.length);
 };
+
 gui.add(debugObject, "generateSphere").name("Generate Sphere");
-gui.add(debugObject, "generateBox").name("Generate Box");
-gui.add(debugObject, "reset").name("Reset scene");
+gui.add(debugObject, "shootSphere").name("Shoot Sphere");
+gui.add(debugObject, "remoteAllObjects").name("Remove all objects");
 
 /**
  * Base
@@ -72,18 +84,19 @@ world.allowSleep = true; // Allow bodies to sleep when they are not moving (perf
 world.gravity.set(0, -9.81, 0); // gravity
 
 // Materials
-// Customs
-const concreteMaterial = new CANNON.Material("concrete");
-const plasticMaterial = new CANNON.Material("plastic");
+//
+// Customs materials interactions
+// const concreteMaterial = new CANNON.Material("concrete");
+// const plasticMaterial = new CANNON.Material("plastic");
 
-const concretePlasticContactMaterial = new CANNON.ContactMaterial(
-	concreteMaterial,
-	plasticMaterial,
-	{
-		friction: 0,
-		restitution: 1,
-	}
-);
+// const concretePlasticContactMaterial = new CANNON.ContactMaterial(
+// 	concreteMaterial,
+// 	plasticMaterial,
+// 	{
+// 		friction: 0,
+// 		restitution: 1,
+// 	}
+// );
 
 // world.addContactMaterial(concretePlasticContactMaterial);
 
@@ -102,23 +115,6 @@ const defaultContactMaterial = new CANNON.ContactMaterial(
 world.addContactMaterial(defaultContactMaterial);
 // Set the default contact material to all bodies that do not have a specific contact material defined
 world.defaultContactMaterial = defaultContactMaterial;
-
-// Sphere shape
-// const sphereShape = new CANNON.Sphere(0.5);
-// const sphereBody = new CANNON.Body({
-// 	mass: 1,
-// 	position: new CANNON.Vec3(0, 3, 0),
-// 	shape: sphereShape,
-// });
-
-// Applying force
-// sphereBody.applyLocalForce(
-// 	new CANNON.Vec3(150, 300, 0), // Force vector
-// 	new CANNON.Vec3(0, 0, 0) // Origin point (where the force is applied)
-// );
-
-// Add the sphere body to the physics world
-// world.addBody(sphereBody);
 
 // Floor
 const floorShape = new CANNON.Plane();
@@ -140,12 +136,15 @@ const poolWidth = 8;
 const poolWallThickness = 0.5;
 const poolWallHeight = 1.5;
 
-const poolGreenMaterial = new THREE.MeshStandardMaterial({
-	color: "#428F41",
-	metalness: 0.3,
-	roughness: 0.4,
-	envMapIntensity: 0.5,
-	// wireframe: true,
+const poolGreenMaterial = new THREE.MeshPhysicalMaterial({
+	color: "#08770a",
+	metalness: 0.5,
+	roughness: 1,
+	sheen: 1,
+	sheenRoughness: 1,
+	sheenColor: "#2c5431",
+	clearcoat: 1,
+	clearcoatRoughness: 1,
 	side: THREE.DoubleSide,
 });
 const poolWoodMaterial = new THREE.MeshStandardMaterial({
@@ -243,14 +242,10 @@ poolPhysicsBody.addShape(
 
 world.addBody(poolPhysicsBody);
 
-// floor.receiveShadow = true;
-// floor.rotation.x = -Math.PI * 0.5;
-// scene.add(floor);
-
 /**
  * Lights
  */
-const ambientLight = new THREE.AmbientLight(0xffffff, 2.1);
+const ambientLight = new THREE.AmbientLight(0xffffff, 2.2);
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -296,7 +291,7 @@ const camera = new THREE.PerspectiveCamera(
 	0.1,
 	100
 );
-camera.position.set(-5, 5, 5);
+camera.position.set(-12, 12, -12);
 scene.add(camera);
 
 // Controls
@@ -317,7 +312,6 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 /**
  * Generate spheres
  */
-
 const objectsToUpdate = [];
 
 const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
@@ -326,13 +320,12 @@ const objectMaterial = new THREE.MeshStandardMaterial({
 	roughness: 0.4,
 });
 
-function generateSphere(radius, position) {
+function createSphere(radius, position) {
 	// ThreeJS mesh
 	const mesh = new THREE.Mesh(sphereGeometry, objectMaterial);
 	mesh.scale.setScalar(radius);
 	mesh.castShadow = true;
 	mesh.position.copy(position);
-	scene.add(mesh);
 
 	// CANNON body
 	const shape = new CANNON.Sphere(radius);
@@ -345,88 +338,215 @@ function generateSphere(radius, position) {
 	body.position.copy(position);
 	body.addEventListener("collide", playCollisionSound);
 
-	// Apply a random force to the sphere
-	body.applyLocalForce(
-		new CANNON.Vec3(-Math.random() * 400, 300, -Math.random() * 400), // Force vector
-		new CANNON.Vec3(0, 0, 0) // Origin point (where the force is applied)
-	);
-	world.addBody(body);
-
-	// Add to objects to update array
-	objectsToUpdate.push({ mesh, body });
+	return { mesh, body };
 }
 
-// Generate 10 spheres on page load with 1s interval between each
-for (let i = 0; i < 12; i++) {
-	setTimeout(() => {
-		generateSphere(Math.random() + 0.25, {
-			x: 5,
-			y: 3,
-			z: 5,
-		});
-	}, i * 500); // Each sphere generated 500ms after the previous one
+function shootSphere() {
+	// Rayon de la sphère
+	const radius = 0.5;
+
+	// Obtenir la position globale du canon dans le monde
+	const canonWorldPosition = new THREE.Vector3();
+	canon.getWorldPosition(canonWorldPosition);
+
+	// Calculer la direction de tir
+	// On place la direction de tir sur la face haut du canon
+	const canonDirection = new THREE.Vector3(0, canonHeight, 0); // Direction locale du canon vers le haut
+
+	// Créer une matrice pour représenter la transformation du canon
+	const canonWorldMatrix = new THREE.Matrix4();
+	canon.updateMatrixWorld();
+	canonWorldMatrix.copy(canon.matrixWorld);
+
+	// On applique la transformation du monde pour obtenir la direction de tir correcte
+	canonDirection.transformDirection(canonWorldMatrix);
+	canonDirection.normalize();
+
+	// On positionne la sphère un peu devant le canon
+	const shootPosition = canonWorldPosition
+		.clone()
+		.add(canonDirection.clone().multiplyScalar(0.8));
+
+	// Créer la sphère
+	const { mesh, body } = createSphere(radius, shootPosition);
+
+	// Appliquer une force dans la direction de tir
+	const shootingPower = debugObject.canonShootingPower;
+	const shootForce = new CANNON.Vec3(
+		canonDirection.x * shootingPower,
+		canonDirection.y * shootingPower,
+		canonDirection.z * shootingPower
+	);
+
+	// Appliquer la force au corps de la sphère
+	body.applyLocalForce(shootForce, new CANNON.Vec3(0, 0, 0));
+
+	// Ajouter la sphère à la scène et au monde physique
+	// Ajouter la sphère à l'array des objets à mettre à jour
+	scene.add(mesh);
+	world.addBody(body);
+	objectsToUpdate.push({ mesh, body });
 }
 
 /**
- * Generate boxes
+ * Canon
  */
+debugObject.canonAltitude = 0.5; // Height of the cannon above the ground
+debugObject.canonHorizontalOrientation = 0; // Rotation angle in radians
+debugObject.canonVerticalOrientation = Math.PI * 0.25; // Vertical orientation of the cannon
 
-const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+debugObject.canonOrbitAngle = Math.PI * 0.25;
+debugObject.canonOrbitRadius = 14; // Distance from the center of the pool
+debugObject.canonOrbitSpeed = 1.5;
 
-function generateBox(size, position) {
-	// ThreeJS mesh
-	const mesh = new THREE.Mesh(boxGeometry, objectMaterial);
-	mesh.scale.setScalar(size);
-	mesh.castShadow = true;
-	mesh.position.copy(position);
-	scene.add(mesh);
+debugObject.canonShootingPower = 650; // Shooting power
+debugObject.canonShootingDelay = 200; // Frequency of shooting in milliseconds
 
-	// CANNON body
-	const shape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2));
-	const body = new CANNON.Body({
-		mass: 1,
-		position: new CANNON.Vec3(position.x, position.y, position.z),
-		shape: shape,
-		material: defaultMaterial,
+debugObject.canonIsRotating = false;
+debugObject.canonIsShooting = false;
+debugObject.shootingInterval = null; // Store the interval ID for proper cleanup
+
+const canonGroup = new THREE.Group();
+canonGroup.position.set(0, debugObject.canonAltitude, 0); // Set initial position of the canon group
+scene.add(canonGroup);
+
+const canonHeight = 1;
+const canon = new THREE.Mesh(
+	new THREE.CylinderGeometry(1, 0.4, canonHeight, 16),
+	new THREE.MeshStandardMaterial({
+		color: "#444444",
+		metalness: 0.3,
+		roughness: 0.4,
+	})
+);
+canonGroup.add(canon);
+canonGroup.rotateY(debugObject.canonOrbitAngle); // Set initial rotation of the canon group
+
+const canonFolder = gui.addFolder("Canon Controls");
+
+canonFolder
+	.add(debugObject, "canonAltitude")
+	.min(0)
+	.max(10)
+	.step(0.01)
+	.name("Canon Altitude")
+	.onChange((value) => {
+		canonGroup.position.set(0, value, 0);
+	}); // Update the position of the canon group when altitude changes
+
+canonFolder
+	.add(debugObject, "canonHorizontalOrientation")
+	.min(-Math.PI)
+	.max(Math.PI)
+	.step(0.01)
+	.name("Horizontal Orientation")
+	.onChange((value) => {
+		canon.rotation.y = value;
 	});
-	body.position.copy(position);
-	body.addEventListener("collide", playCollisionSound);
 
-	body.applyLocalForce(
-		new CANNON.Vec3(Math.random() * 400, 300, Math.random() * 400), // Force vector
-		new CANNON.Vec3(0, 0, 0) // Origin point (where the force is applied)
-	);
+canonFolder
+	.add(debugObject, "canonVerticalOrientation")
+	.min(0)
+	.max(Math.PI)
+	.step(0.01)
+	.name("Vertical Orientation")
+	.onChange((value) => {
+		canon.rotation.z = value;
+	});
+canonFolder
+	.add(debugObject, "canonOrbitAngle")
+	.min(0)
+	.max(Math.PI * 2)
+	.step(0.01)
+	.name("Orbit Angle")
+	.onChange((value) => {
+		if (!debugObject.canonIsRotating) {
+			canonGroup.rotation.y = value; // Update the rotation of the canon group
+		}
+	});
 
-	world.addBody(body);
+canonFolder
+	.add(debugObject, "canonOrbitRadius")
+	.min(0)
+	.max(25)
+	.step(0.1)
+	.name("Orbit Radius")
+	.onChange((value) => {
+		canon.position.setX(value);
+	});
+canonFolder
+	.add(debugObject, "canonOrbitSpeed")
+	.min(0)
+	.max(10)
+	.step(0.001)
+	.name("Rotation Speed");
 
-	// Add to objects to update array
-	objectsToUpdate.push({ mesh, body });
-}
-for (let i = 0; i < 12; i++) {
-	setTimeout(() => {
-		generateBox(Math.random() + 0.5, {
-			x: -5,
-			y: 3,
-			z: -5,
-		});
-	}, i * 500); // Each sphere generated 500ms after the previous one
-}
+canonFolder
+	.add(debugObject, "canonShootingPower")
+	.min(0)
+	.max(2500)
+	.step(50)
+	.name("Shooting Power (N)");
 
-const axesHelper = new THREE.AxesHelper(5);
-axesHelper.position.set(0, 0.1, 0); // Slightly above
+canonFolder
+	.add(debugObject, "canonShootingDelay")
+	.min(50)
+	.max(2000)
+	.step(50)
+	.name("Shooting Interval (ms)")
+	.onChange((value) => {
+		if (value < 50) {
+			debugObject.canonShootingDelay = 50;
+		}
+		// If currently shooting, restart the interval with new speed
+		if (debugObject.canonIsShooting && debugObject.shootingInterval) {
+			clearInterval(debugObject.shootingInterval);
+			debugObject.shootingInterval = setInterval(() => {
+				if (debugObject.canonIsShooting) {
+					shootSphere();
+				}
+			}, debugObject.canonShootingDelay);
+		}
+	});
+canonFolder
+	.add(debugObject, "canonIsShooting")
+	.name("Canon shooting")
+	.onChange((value) => {
+		if (value) {
+			// Start shooting
+			debugObject.shootingInterval = setInterval(() => {
+				if (debugObject.canonIsShooting) {
+					shootSphere();
+				}
+			}, debugObject.canonShootingDelay);
+		} else {
+			// Stop shooting
+			if (debugObject.shootingInterval) {
+				clearInterval(debugObject.shootingInterval);
+				debugObject.shootingInterval = null;
+			}
+		}
+	});
+canonFolder.add(debugObject, "canonIsRotating").name("Canon orbiting");
+// .onChange((value) => {
+// 	if (value) {
+// 		canonGroup.rotation.y = debugObject.canonRotationAngle; // Reset rotation to the specified angle
+// 	} else {
+// 		canonGroup.rotation.y = 0; // Reset rotation to 0 if not rotating
+// 	}
+// });
+
+canon.position.set(debugObject.canonOrbitRadius, debugObject.canonAltitude, 0);
+canon.rotation.y = debugObject.canonHorizontalOrientation; // Set initial horizontal orientation
+canon.rotation.z = debugObject.canonVerticalOrientation;
+canon.castShadow = true;
 
 /**
  * Animate
  */
-// const clock = new THREE.Clock();
-// let previousTime = 0;
 const timer = new Timer();
 
 const tick = () => {
-	// const elapsedTime = clock.getElapsedTime();
-	// const deltaTime = elapsedTime - previousTime;
-	// previousTime = elapsedTime;
-
 	// Timer
 	timer.update();
 	const elapsedTime = timer.getElapsed();
@@ -437,11 +557,16 @@ const tick = () => {
 	// 	sphereBody.position // Origin point (where the force is applied)
 	// );
 
+	// Canon rotation
+	if (debugObject.canonIsRotating) {
+		canonGroup.rotation.y += debugObject.canonOrbitSpeed * timer.getDelta();
+	}
+
 	// Update physics world
 	world.step(1 / 60, timer.getDelta(), 3);
 
 	// Update 3D world
-	// sphere.position.copy(sphereBody.position);
+	// sphere.position.copy(sphereBody.position);       // single sphere update
 
 	objectsToUpdate.forEach((object) => {
 		// Update mesh position
