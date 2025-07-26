@@ -1,4 +1,4 @@
-# 🎱 Three.js – Simulateur de Physique avec canon
+# 🌍 Three.js – Simulateur de Physique avec canon 🏴‍☠️🎱
 
 Une scène 3D interactive de simulation physique créée avec [Three.js](https://threejs.org/) et [Cannon-es](https://pmndrs.github.io/cannon-es/docs/modules.html), inspirée du parcours Three.js Journey par Bruno Simon. Avec un système de canon interactif et des contrôles avancés.
 
