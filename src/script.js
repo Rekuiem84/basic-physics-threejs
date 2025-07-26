@@ -541,6 +541,15 @@ canon.rotation.y = debugObject.canonHorizontalOrientation; // Set initial horizo
 canon.rotation.z = debugObject.canonVerticalOrientation;
 canon.castShadow = true;
 
+// Start shooting interval if canonIsShooting is true by default
+if (debugObject.canonIsShooting) {
+	debugObject.shootingInterval = setInterval(() => {
+		if (debugObject.canonIsShooting) {
+			shootSphere();
+		}
+	}, debugObject.canonShootingDelay);
+}
+
 /**
  * Animate
  */
